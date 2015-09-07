@@ -8,7 +8,7 @@ Copy the script to your path, e.g. $HOME/bin or /usr/local/bin.
 
 ## Usage:
 
-    fthiele@bishkek:~/dev/git/pubkeypub/bin$ ./publish_key.sh
+    fthiele@bishkek:~/dev/git/pubkeypub$ bin/publish_key.sh
 
     Please provide a remote host to connect to.
 
@@ -16,15 +16,20 @@ Copy the script to your path, e.g. $HOME/bin or /usr/local/bin.
     # public key publisher #
     ########################
 
-    Usage: ./publish_key.sh -h REMOTE_HOST [ -u REMOTE_USERNAME ] [ -p PATH/TO/PUBLIC_KEY ] [ -d ]
+    Usage: bin/publish_key.sh -h REMOTE_HOST [ -u REMOTE_USERNAME ] [ -p PATH/TO/PUBLIC_KEY ] [ -f PASSWORD_FILE ] [ -r ]
 
     Connects with to REMOTE_HOST using REMOTE_USERNAME and publishes the given
     PUBLIC_KEY into the .ssh/authorized_keys of REMOTE_USERNAME home. If no
     REMOTE_USERNAME was given, current USER is assumed also as remote name.
     If the PATH/TO/PUBLIC_KEY is omitted, the USER/.ssh/id_rsa.pub is assumed
-    for the authorization process. Append a -d for performing a dry-run.
+    for the authorization process.
 
-    fthiele@bishkek:~/dev/git/pubkeypub/bin$
+    You may set a PASSWORD_FILE using -f file.txt to enable batch processing. You
+    need to set the file chmod 0600 to deny any access from others. You enter
+    your REMOTE_USERNAME password there. Useful for batch processing several machines.
+
+    Use flag -r to remove duplicate entries of the same key in authorized_keys.
+
 
 ## License Notice
 
