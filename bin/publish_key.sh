@@ -22,6 +22,9 @@
 #
 PUBLIC_KEY_PATH="${HOME}/.ssh/id_rsa.pub"
 REMOTE_USERNAME=${USER}
+PASSWORD_FILE="None"
+SSH_PASS=
+SSH_OPTIONS="-oConnectTimeout=5 -oStrictHostKeyChecking=no"
 
 usage() {
   cat << __EOF__
@@ -29,30 +32,39 @@ usage() {
 # public key publisher #
 ########################
 
-Usage: $0 -h REMOTE_HOST [ -u REMOTE_USERNAME ] [ -p PATH/TO/PUBLIC_KEY ] [ -d ]
+Usage: $0 -h REMOTE_HOST [ -u REMOTE_USERNAME ] [ -p PATH/TO/PUBLIC_KEY ] [ -f PASSWORD_FILE ] [ -r ]
 
 Connects with to REMOTE_HOST using REMOTE_USERNAME and publishes the given
 PUBLIC_KEY into the .ssh/authorized_keys of REMOTE_USERNAME home. If no
 REMOTE_USERNAME was given, current USER is assumed also as remote name.
 If the PATH/TO/PUBLIC_KEY is omitted, the USER/.ssh/id_rsa.pub is assumed
-for the authorization process. Append a -d for performing a dry-run.
+for the authorization process.
+
+You may set a PASSWORD_FILE using -f file.txt to enable batch processing. You
+need to set the file chmod 0600 to deny any access from others. You enter
+your REMOTE_USERNAME password there. Useful for batch processing several machines.
+
+Use flag -r to remove duplicate entries of the same key in authorized_keys.
 
 __EOF__
 }
 
-while getopts "h:u:p:d" opt; do
+while getopts "h:u:p:f:r" opt; do
   case $opt in
     h)
-      REMOTE_HOST=$OPTARG;
+      REMOTE_HOST=$OPTARG
       ;;
     u)
-      REMOTE_USERNAME=$OPTARG;
+      REMOTE_USERNAME=$OPTARG
       ;;
     p)
       PUBLIC_KEY_PATH=$OPTARG
       ;;
-    d)
-      DRY_RUN=true
+    f)
+      PASSWORD_FILE=$OPTARG
+      ;;
+    r)
+      REMOVE_DUPLICATES="true"
       ;;
     \?)
       usage
@@ -74,7 +86,7 @@ if [ -z "${REMOTE_HOST}" ]; then
   exit 1
 fi
 
-if [ ! -f $PUBLIC_KEY_PATH ] ; then
+if [ ! -f $PUBLIC_KEY_PATH ]; then
   echo
   echo "File not readable at $PUBLIC_KEY_PATH!">&2
   echo
@@ -90,11 +102,40 @@ if [ $(grep -v ^ssh $PUBLIC_KEY_PATH >> /dev/null) ]; then
 fi
 pub_key="$(cat $PUBLIC_KEY_PATH)"
 
+if [ ! "$PASSWORD_FILE" = "None" ]; then
+  if [ ! -f $PASSWORD_FILE ]; then
+    echo
+    echo "Password file not readable at ${PASSWORD_FILE}."
+    echo
+    usage
+    exit 1
+  else
+    SSH_PASS="sshpass -p ${PASSWORD_FILE}"
+  fi
+fi
+
+echo "### REMOTE_HOST: $REMOTE_HOST"
 if [ -z "${DRY_RUN}" ]; then
-  ssh $REMOTE_USERNAME@$REMOTE_HOST "mkdir ~/.ssh -p && echo \"$pub_key\" >> ~/.ssh/authorized_keys"
-else
-  echo
-  echo "## DRY RUN ##"
-  echo
-  echo ssh $REMOTE_USERNAME@$REMOTE_HOST "mkdir ~/.ssh -p && echo \"$pub_key\" >> ~/.ssh/authorized_keys"
+  $SSH_PASS ssh $SSH_OPTIONS $REMOTE_USERNAME@$REMOTE_HOST 'bash -s' << __EOF__
+    mkdir ~/.ssh -p
+    touch ~/.ssh/authorized_keys
+
+    # fix wrong lines containing double quotes on beginning and end of a key
+    egrep -vwE "^\".*\"$" ~/.ssh/authorized_keys > ~/.ssh/authorized_keys_
+    mv ~/.ssh/authorized_keys_ ~/.ssh/authorized_keys
+
+    # check if key already exists
+    grep -Fxq "\"$pub_key\"" ~/.ssh/authorized_keys >> /dev/null
+    if [ ! \$? == 0  ]; then
+      echo "${REMOTE_HOST}: Key is added remotely..."
+      echo $pub_key >> ~/.ssh/authorized_keys
+    else
+      echo "${REMOTE_HOST}: Key already registered remotely..."
+    fi
+    if [ "$REMOVE_DUPLICATES" == "true" ]; then
+      echo "${REMOTE_HOST}: Remove duplicate keys remotely... "
+      sort -u ~/.ssh/authorized_keys > ~/.ssh/authorized_keys_
+      mv ~/.ssh/authorized_keys_ ~/.ssh/authorized_keys
+    fi
+__EOF__
 fi
