@@ -91,10 +91,10 @@ fi
 pub_key="$(cat $PUBLIC_KEY_PATH)"
 
 if [ -z "${DRY_RUN}" ]; then
-  ssh $REMOTE_USERNAME@$REMOTE_HOST "echo \"$pub_key\" >> ~/.ssh/authorized_keys"
+  ssh $REMOTE_USERNAME@$REMOTE_HOST "mkdir ~/.ssh -p && echo \"$pub_key\" >> ~/.ssh/authorized_keys"
 else
   echo
   echo "## DRY RUN ##"
   echo
-  echo ssh $REMOTE_USERNAME@$REMOTE_HOST "echo \"$pub_key\" >> ~/.ssh/authorized_keys"
+  echo ssh $REMOTE_USERNAME@$REMOTE_HOST "mkdir ~/.ssh -p && echo \"$pub_key\" >> ~/.ssh/authorized_keys"
 fi
